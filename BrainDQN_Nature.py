@@ -94,7 +94,7 @@ class BrainDQN:
 	def createTrainingMethod(self):
 		self.actionInput = tf.placeholder("float",[None,self.actions])
 		self.yInput = tf.placeholder("float", [None]) 
-		Q_Action = tf.reduce_sum(tf.mul(self.QValue, self.actionInput), reduction_indices = 1)
+		Q_Action = tf.reduce_sum(tf.multiply(self.QValue, self.actionInput), reduction_indices = 1)
 		self.cost = tf.reduce_mean(tf.square(self.yInput - Q_Action))
 		self.trainStep = tf.train.AdamOptimizer(1e-6).minimize(self.cost)
 
