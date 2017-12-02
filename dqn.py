@@ -148,14 +148,14 @@ def train_network(session):
                 action_t = minibatch[i][1]
                 reward_t = minibatch[i][2]
                 state_t1 = minibatch[i][3]
-                terminal = minibatch[i][4]
+                done_t = minibatch[i][4]
 
                 inputs[i:i + 1] = state_t
 
                 targets[i] = session.run(dense_2, feed_dict={state_input:state_t})
                 Q_sa = session.run(dense_2, feed_dict={state_input:state_t1})
 
-                if done:
+                if done_t:
                     targets[i,action_t] = reward_t
                 else:
                     targets[i,action_t] = reward_t + GAMMA*np.max(Q_sa)
@@ -164,7 +164,7 @@ def train_network(session):
         states = states_
         t += 1
 
-        if t%1000 == 0:
+        if t > observe and t%1000 == 0:
             saver.save(session, 'saved_networks_dqn/' + 'network' + '-dqn', global_step=t)
 
         if done:
