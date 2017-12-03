@@ -175,6 +175,6 @@ def play():
 
 if len(sys.argv) > 1 and sys.argv[1]=="notrain":
     INITIAL_EPSILON = 0
-    OBSERVATION = 0
+    OBSERVATION = 999999999999999999
     FRAME_PER_ACTION = 1
 play()
