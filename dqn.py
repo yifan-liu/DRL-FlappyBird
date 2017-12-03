@@ -6,6 +6,7 @@ import random
 import numpy as np
 from collections import deque
 import cv2
+import re
 
 GAMMA = 0.99
 ACTIONS = 2
@@ -19,6 +20,8 @@ FRAME_PER_ACTION = 2
 LEARNING_RATE = 1e-6
 UPDATE_TIME = 100
 
+MODEL_PATH = "saved_networks_dqn"
+
 class DQN:
     def __init__(self, actions):
         # relay memory
@@ -26,6 +29,7 @@ class DQN:
         # parameters
         self.time_step = 0
         self.pre_time_step = 0
+        self.last_model_time_step = 0
         self.epsilon = INITIAL_EPSILON
         self.actions = actions
 
@@ -44,9 +48,10 @@ class DQN:
         self.saver = tf.train.Saver()
         self.session = tf.InteractiveSession()
         self.session.run(tf.global_variables_initializer())
-        checkpoint = tf.train.get_checkpoint_state("saved_networks_dqn")
+        checkpoint = tf.train.get_checkpoint_state(MODEL_PATH)
         if checkpoint and checkpoint.model_checkpoint_path:
                 self.saver.restore(self.session, checkpoint.model_checkpoint_path)
+                self.last_model_time_step = int(re.search(re.compile('\\d+'), checkpoint.model_checkpoint_path).group())
                 print "Successfully loaded:", checkpoint.model_checkpoint_path
         else:
                 print "Could not find old network weights"
@@ -112,7 +117,7 @@ class DQN:
         self.session.run(self.train_op, feed_dict={self.target_input:target_batch,self.action_input:action_batch,self.state_input:state_batch})
 
         if self.time_step % 10000 == 0:
-            self.saver.save(self.session,"saved_networks_dqn/weights-",global_step=self.time_step)
+            self.saver.save(self.session,MODEL_PATH + "/weights-",global_step=self.time_step+self.last_model_time_step)
 
         if self.time_step % UPDATE_TIME == 0:
             self.copy_target_network()
@@ -146,7 +151,7 @@ class DQN:
 
     def initialize(self, flappyBird):
         action = np.array([1,0])
-        state, reward, done = flappyBird.frame_step(action)
+        state, reward, done, _ = flappyBird.frame_step(action)
         state = preprocess(state)
         state = state.reshape((80,80))
         self.current_state = np.stack((state,state,state,state),axis=2)
@@ -156,8 +161,8 @@ def preprocess(observation):
     ret, observation = cv2.threshold(observation,1,255,cv2.THRESH_BINARY)
     return np.reshape(observation,(80,80,1))
 
-def print_info(network):
-    print "TIMESTEP", network.time_step, "SURVIVAL_TIME", network.time_step-network.pre_time_step, "EPSILON", network.epsilon
+def print_info(network,score):
+    print "TIMESTEP", network.time_step, "EPSILON", network.epsilon, "SCORE", score
     network.pre_time_step = network.time_step
 
 def play():
@@ -166,15 +171,24 @@ def play():
     flappyBird = game.GameState()
     network.initialize(flappyBird);
 
+    _score = 0
     while True:
         action = network.get_action()
-        next_state, reward, done = flappyBird.frame_step(action)
-        if done: print_info(network)
+        next_state, reward, done, score = flappyBird.frame_step(action)
+        if score != 0: _score = score
+        if done:
+            print_info(network,_score)
+            score = 0
         next_state = preprocess(next_state)
         network.process(next_state, action, reward, done)
 
 if len(sys.argv) > 1 and sys.argv[1]=="notrain":
     INITIAL_EPSILON = 0
-    OBSERVATION = 999999999999999999
+    OBSERVATION = 99999999999999
     FRAME_PER_ACTION = 1
+    if len(sys.argv) > 2:
+        if sys.argv[2] == '140k':
+            MODEL_PATH = "140k-saved_networks_dqn"
+        elif sys.argv[2] == '200k':
+            MODEL_PATH = "200k-saved_networks_dqn"
 play()
