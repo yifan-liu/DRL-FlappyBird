@@ -10,12 +10,12 @@ import cv2
 GAMMA = 0.99
 ACTIONS = 2
 OBSERVATION = 2000
-EXPLORE = 300000
+EXPLORE = 1000000
 INITIAL_EPSILON = 0.1
 FINAL_EPSILON = 0.0001
-REPLAY_MEMORY = 1000000
+REPLAY_MEMORY = 50000
 BATCH_SIZE = 32
-FRAME_PER_ACTION = 2
+FRAME_PER_ACTION = 3
 LEARNING_RATE = 1e-6
 UPDATE_TIME = 100
 
@@ -187,4 +187,8 @@ def play():
         next_state = preprocess(next_state)
         network.process(next_state, action, reward, done)
 
+if len(sys.argv) > 1 and sys.argv[1]=="notrain":
+    INITIAL_EPSILON = 0
+    OBSERVATION = 0
+    FRAME_PER_ACTION = 1
 play()
