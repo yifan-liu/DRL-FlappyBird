@@ -9,9 +9,9 @@ import cv2
 
 GAMMA = 0.99
 ACTIONS = 2
-OBSERVATION = 40
+OBSERVATION = 2000
 EXPLORE = 300000
-INITIAL_EPSILON = 0.2
+INITIAL_EPSILON = 0.1
 FINAL_EPSILON = 0.0001
 REPLAY_MEMORY = 1000000
 BATCH_SIZE = 32
@@ -114,8 +114,8 @@ class DQN:
         next_state_batch = [data[3] for data in minibatch]
 
         target_batch = []
-        Q_value_batch = self.session.run(self.Q_value_T, feed_dict={self.state_input:next_state_batch})
-
+        # Q_value_batch = self.session.run(self.Q_value_T, feed_dict={self.state_input:next_state_batch})
+        Q_value_batch = self.Q_value_T.eval(feed_dict={self.state_input_T:next_state_batch})
         for i in range(0, BATCH_SIZE):
             done = minibatch[i][4]
             if done:
