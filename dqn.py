@@ -7,168 +7,184 @@ import numpy as np
 from collections import deque
 import cv2
 
-IMG_ROWS = 80
-IMG_COLS = 80
-IMG_CHANNELS = 4
 GAMMA = 0.99
 ACTIONS = 2
-OBSERVATION = 3200
-EXPLORE = 3000000
-INITIAL_EPSILON = 0.1
+OBSERVATION = 40
+EXPLORE = 300000
+INITIAL_EPSILON = 0.2
 FINAL_EPSILON = 0.0001
-REPLAY_MEMORY = 50000
+REPLAY_MEMORY = 1000000
 BATCH_SIZE = 32
-FRAME_PER_ACTION = 4
-LEARNING_RATE = 1e-4
+FRAME_PER_ACTION = 2
+LEARNING_RATE = 1e-6
+UPDATE_TIME = 100
 
-# create network
-state_input = tf.placeholder(tf.float32, [None,IMG_ROWS,IMG_COLS,IMG_CHANNELS]) # [None,80,80,4]
+class DQN:
+    def __init__(self, actions):
+        # relay memory
+        self.replay_memory = deque()
+        # parameters
+        self.time_step = 0
+        self.pre_time_step = 0
+        self.epsilon = INITIAL_EPSILON
+        self.actions = actions
 
-# convolution
-conv_1 = tf.layers.conv2d(
-    inputs=state_input,
-    filters=32,
-    kernel_size=8,
-    strides=4,
-    padding="same",
-    activation=tf.nn.relu
-) # [None,20,20,32]
-pool_1 = tf.layers.max_pooling2d(
-    inputs=conv_1,
-    pool_size=2,
-    strides=2,
-    padding="same"
-) # [None,10,10,32]
-conv_2 = tf.layers.conv2d(
-    inputs=pool_1,
-    filters=64,
-    kernel_size=4,
-    strides=2,
-    padding="same",
-    activation=tf.nn.relu
-) # [None,5,5,64]
-conv_3 = tf.layers.conv2d(
-    inputs=conv_2,
-    filters=64,
-    kernel_size=3,
-    strides=1,
-    padding="same",
-    activation=tf.nn.relu
-) # [None,5,5,64]
-flatten_1 = tf.layers.flatten(conv_3) # [None,640]
+        # q network
+        self.state_input,self.Q_value,self.W_conv1,self.b_conv1,self.W_conv2,self.b_conv2,self.W_conv3,self.b_conv3,self.W_fc1,self.b_fc1,self.W_fc2,self.b_fc2 = self.create_network()
+        # target q network
+        self.state_input_T,self.Q_value_T,self.W_conv1_T,self.b_conv1_T,self.W_conv2_T,self.b_conv2_T,self.W_conv3_T,self.b_conv3_T,self.W_fc1_T,self.b_fc1_T,self.W_fc2_T,self.b_fc2_T = self.create_network()
 
-#DQN
-dense_1 = tf.layers.dense(
-    inputs=flatten_1,
-    units=512,
-    activation=tf.nn.relu
-)
-dense_2 = tf.layers.dense(
-    inputs=dense_1,
-    units=2
-)
+        self.copy_target_network_op = [self.W_conv1_T.assign(self.W_conv1),self.b_conv1_T.assign(self.b_conv1),self.W_conv2_T.assign(self.W_conv2),self.b_conv2_T.assign(self.b_conv2),self.W_conv3_T.assign(self.W_conv3),self.b_conv3_T.assign(self.b_conv3),self.W_fc1_T.assign(self.W_fc1),self.b_fc1_T.assign(self.b_fc1),self.W_fc2_T.assign(self.W_fc2),self.b_fc2_T.assign(self.b_fc2)]
 
-targets_input = tf.placeholder(tf.float32, [None,2])
+        self.action_input = tf.placeholder(tf.float32, [None,self.actions])
+        self.target_input = tf.placeholder(tf.float32, [None])
+        self.loss = tf.reduce_sum(tf.square(self.target_input-tf.reduce_sum(tf.multiply(self.Q_value,self.action_input),reduction_indices=1)))
+        self.train_op = tf.train.AdamOptimizer(LEARNING_RATE).minimize(self.loss)
 
-loss = tf.reduce_mean(tf.square(dense_2-targets_input))
-train_op = tf.train.AdamOptimizer(LEARNING_RATE).minimize(loss)
+        self.saver = tf.train.Saver()
+        self.session = tf.InteractiveSession()
+        self.session.run(tf.global_variables_initializer())
+        checkpoint = tf.train.get_checkpoint_state("saved_networks_dqn")
+        if checkpoint and checkpoint.model_checkpoint_path:
+                self.saver.restore(self.session, checkpoint.model_checkpoint_path)
+                print "Successfully loaded:", checkpoint.model_checkpoint_path
+        else:
+                print "Could not find old network weights"
 
-def preprocess(observation):
-    observation = cv2.cvtColor(cv2.resize(observation, (IMG_ROWS,IMG_COLS)), cv2.COLOR_BGR2GRAY)
-    ret, observation = cv2.threshold(observation,1,255,cv2.THRESH_BINARY)
-    return np.reshape(observation,(1,IMG_ROWS,IMG_COLS,1))
+    def copy_target_network(self):
+        self.session.run(self.copy_target_network_op)
 
-def train_network(session):
-    flappy_bird = game.GameState()
-    session.run(tf.global_variables_initializer())
+    def weight_variable(self,shape):
+        initial = tf.truncated_normal(shape, stddev = 0.01)
+        return tf.Variable(initial)
 
-    saver = tf.train.Saver()
-    checkpoint = tf.train.get_checkpoint_state("saved_networks_dqn")
-    if checkpoint and checkpoint.model_checkpoint_path:
-            saver.restore(session, checkpoint.model_checkpoint_path)
-            print "Successfully loaded:", checkpoint.model_checkpoint_path
-    else:
-            print "Could not find old network weights"
+    def bias_variable(self,shape):
+        initial = tf.constant(0.01, shape = shape)
+        return tf.Variable(initial)
 
-    # replay memory
-    replay_memory = deque()
+    def conv2d(self,x, W, stride):
+        return tf.nn.conv2d(x, W, strides = [1, stride, stride, 1], padding = "SAME")
 
-    # get first state by doing nothing
-    do_nothing = np.zeros(ACTIONS)
-    do_nothing[0] = 1
-    observation0, reward0, done = flappy_bird.frame_step(do_nothing)
-    observation0 = preprocess(observation0)
+    def max_pool_2x2(self,x):
+        return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides = [1, 2, 2, 1], padding = "SAME")
 
-    # stacked 4 fromes
-    states = np.stack((observation0,observation0,observation0,observation0), axis=3)
-    states = states.reshape(1, states.shape[1], states.shape[2], states.shape[3]) # 1x80x80x4
+    def create_network(self):
+        # network weights
+        # convolution
+        W_conv1 = self.weight_variable([8,8,4,32])
+        b_conv1 = self.bias_variable([32])
 
-    epsilon = INITIAL_EPSILON
-    observe = OBSERVATION
+        W_conv2 = self.weight_variable([4,4,32,64])
+        b_conv2 = self.bias_variable([64])
 
-    t = 0
-    t_ = 0
-    while True:
-        loss = 0
-        Q_sa = 0
-        action_index = 0
-        action = np.zeros(ACTIONS)
+        W_conv3 = self.weight_variable([3,3,64,64])
+        b_conv3 = self.bias_variable([64])
 
-        if t % FRAME_PER_ACTION == 0:
-            if random.random() <= epsilon:
-                action_index = random.randrange(ACTIONS)
+        # DQN
+        W_fc1 = self.weight_variable([1600,512])
+        b_fc1 = self.bias_variable([512])
+
+        W_fc2 = self.weight_variable([512,self.actions])
+        b_fc2 = self.bias_variable([self.actions])
+
+        # input layer
+        state_input = tf.placeholder(tf.float32,[None,80,80,4])
+
+        # hidden layers
+        h_conv1 = tf.nn.relu(self.conv2d(state_input,W_conv1,4) + b_conv1)
+        h_pool1 = self.max_pool_2x2(h_conv1)
+
+        h_conv2 = tf.nn.relu(self.conv2d(h_pool1,W_conv2,2) + b_conv2)
+
+        h_conv3 = tf.nn.relu(self.conv2d(h_conv2,W_conv3,1) + b_conv3)
+
+        h_conv3_flat = tf.reshape(h_conv3,[-1,1600])
+        h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat,W_fc1) + b_fc1)
+
+        # Q Value layer
+        Q_value = tf.matmul(h_fc1,W_fc2) + b_fc2
+
+        return state_input,Q_value,W_conv1,b_conv1,W_conv2,b_conv2,W_conv3,b_conv3,W_fc1,b_fc1,W_fc2,b_fc2
+
+    def train_network(self):
+        minibatch = random.sample(self.replay_memory, BATCH_SIZE)
+        state_batch = [data[0] for data in minibatch]
+        action_batch = [data[1] for data in minibatch]
+        reward_batch = [data[2] for data in minibatch]
+        next_state_batch = [data[3] for data in minibatch]
+
+        target_batch = []
+        Q_value_batch = self.session.run(self.Q_value_T, feed_dict={self.state_input:next_state_batch})
+
+        for i in range(0, BATCH_SIZE):
+            done = minibatch[i][4]
+            if done:
+                target_batch.append(reward_batch[i])
             else:
-                action_dist = session.run(dense_2, feed_dict={state_input:states})
-                action_index = action_dist[0].argmax()
+                target_batch.append(reward_batch[i] + GAMMA * np.max(Q_value_batch[i]))
 
+        self.session.run(self.train_op, feed_dict={self.target_input:target_batch,self.action_input:action_batch,self.state_input:state_batch})
+
+        if self.time_step % 10000 == 0:
+            self.saver.save(self.session,"saved_networks_dqn/weights-",global_step=self.time_step)
+
+        if self.time_step % UPDATE_TIME == 0:
+            self.copy_target_network()
+
+    def process(self, next_state, action, reward, done):
+        new_state = np.append(self.current_state[:,:,1:],next_state,axis=2)
+        self.replay_memory.append((self.current_state,action,reward,new_state,done))
+        if len(self.replay_memory) > REPLAY_MEMORY:
+            self.replay_memory.popleft()
+        if self.time_step > OBSERVATION:
+            self.train_network()
+
+        self.current_state = new_state
+        self.time_step += 1
+
+    def get_action(self):
+        Q_value = self.session.run(self.Q_value, feed_dict={self.state_input:[self.current_state]})
+        action = np.zeros(self.actions)
+        action_index = 0
+        if self.time_step % FRAME_PER_ACTION == 0:
+            if random.random() <= self.epsilon:
+                action_index = random.randrange(self.actions)
+            else:
+                action_index = np.argmax(Q_value[0])
         action[action_index] = 1
 
-        # reduce epsilon
-        if epsilon > FINAL_EPSILON and t > observe:
-            epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
+        if self.epsilon > FINAL_EPSILON and self.time_step > OBSERVATION:
+            self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON)/EXPLORE
 
-        # run flappy_bird and get a new observation
-        observation0, reward0, done = flappy_bird.frame_step(action)
-        observation0 = preprocess(observation0) # 1x80x80x1
+        return action
 
-        states_ = np.append(observation0, states[:,:,:,:3], axis=3)
+    def initialize(self, flappyBird):
+        action = np.array([1,0])
+        state, reward, done = flappyBird.frame_step(action)
+        state = preprocess(state)
+        state = state.reshape((80,80))
+        self.current_state = np.stack((state,state,state,state),axis=2)
 
-        replay_memory.append((states,action_index,reward0,states_,done))
-        if len(replay_memory) > REPLAY_MEMORY:
-            replay_memory.popleft()
+def preprocess(observation):
+    observation = cv2.cvtColor(cv2.resize(observation, (80, 80)), cv2.COLOR_BGR2GRAY)
+    ret, observation = cv2.threshold(observation,1,255,cv2.THRESH_BINARY)
+    return np.reshape(observation,(80,80,1))
 
-        if t > observe and t % FRAME_PER_ACTION == 0:
-            minibatch = random.sample(replay_memory, BATCH_SIZE)
+def print_info(network):
+    print "TIMESTEP", network.time_step, "SURVIVAL_TIME", network.time_step-network.pre_time_step, "EPSILON", network.epsilon
+    network.pre_time_step = network.time_step
 
-            inputs = np.zeros((BATCH_SIZE,states.shape[1],states.shape[2],states.shape[3]))
-            targets = np.zeros((inputs.shape[0],ACTIONS)) # 32x2
+def play():
+    network = DQN(ACTIONS)
 
-            for i in range(len(minibatch)):
-                state_t = minibatch[i][0]
-                action_t = minibatch[i][1]
-                reward_t = minibatch[i][2]
-                state_t1 = minibatch[i][3]
-                done_t = minibatch[i][4]
+    flappyBird = game.GameState()
+    network.initialize(flappyBird);
 
-                inputs[i:i + 1] = state_t
+    while True:
+        action = network.get_action()
+        next_state, reward, done = flappyBird.frame_step(action)
+        if done: print_info(network)
+        next_state = preprocess(next_state)
+        network.process(next_state, action, reward, done)
 
-                targets[i] = session.run(dense_2, feed_dict={state_input:state_t})
-                Q_sa = session.run(dense_2, feed_dict={state_input:state_t1})
-
-                if done_t:
-                    targets[i,action_t] = reward_t
-                else:
-                    targets[i,action_t] = reward_t + GAMMA*np.max(Q_sa)
-
-            session.run([train_op], feed_dict={state_input:inputs, targets_input:targets})
-        states = states_
-        t += 1
-
-        if t > observe and t%1000 == 0:
-            saver.save(session, 'saved_networks_dqn/' + 'network' + '-dqn', global_step=t)
-
-        if done:
-            print "TIMESTEP", t, "SURVIVAL TIME", t-t_, "Q_MAX", np.max(Q_sa)
-            t_ = t
-session = tf.Session()
-train_network(session)
+play()
