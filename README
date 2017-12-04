@@ -1,0 +1,43 @@
+## How to use
+
+### Dependencies:
+tensorflow, pygame, opencv-python
+installation:
+pip install tensorflow
+pip install pygame
+pip install opencv-python
+
+### Usage:
+#### 1. Train
+python dqn.py
+
+It loads the model stored in 'saved_networks_dqn' folder, if the model exists, and goes on training
+
+#### 2. Test
+python dqn.py test
+
+It loads the model stored in 'saved_networks_dqn' folder, if the model exists.
+But it won't train the model, it just plays the game using the current model.
+
+##### 2.1 Load pre-trained 140k-model
+python dqn.py test 140k
+
+It loads the pre trained model in '140k-saved_networks_dqn'.
+This model have been trained 140k times of game frame.
+
+##### 2.2 Load pre-trained 200k-model
+python dqn.py test 200k
+
+It loads the pre trained model in '200k-saved_networks_dqn'.
+This model have been trained 200k times of game frame.
+
+##### 2.3 Load pre-trained 460k-model
+python dqn.py test 460k
+
+It loads the pre trained model in '140k-saved_networks_dqn'.
+This model have been trained 460k times of game frame.
+
+#### Performance of pre trained model
+140k model: Avg Score: ~3
+200k model: Avg Score: ~2000
+460k model: Avg Score: The bird is godlike, it never dies
