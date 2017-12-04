@@ -172,17 +172,27 @@ def play():
     network.initialize(flappyBird);
 
     _score = 0
+    total = 0.0
+    num_game = 0
     while True:
         action = network.get_action()
         next_state, reward, done, score = flappyBird.frame_step(action)
         if score != 0: _score = score
         if done:
             print_info(network,_score)
+            total += _score
+            num_game += 1
             score = 0
+
+            if num_game == 10:
+                print "\nlast 10 game avg score", total/num_game, "\n"
+                total = 0.0
+                num_game = 0
+
         next_state = preprocess(next_state)
         network.process(next_state, action, reward, done)
 
-if len(sys.argv) > 1 and sys.argv[1]=="notrain":
+if len(sys.argv) > 1 and sys.argv[1]=="test":
     INITIAL_EPSILON = 0
     OBSERVATION = 99999999999999
     FRAME_PER_ACTION = 1
@@ -191,4 +201,6 @@ if len(sys.argv) > 1 and sys.argv[1]=="notrain":
             MODEL_PATH = "140k-saved_networks_dqn"
         elif sys.argv[2] == '200k':
             MODEL_PATH = "200k-saved_networks_dqn"
+        elif sys.argv[2] == '460k':
+            MODEL_PATH = "460k-saved_networks_dqn"
 play()
