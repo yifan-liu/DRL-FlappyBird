@@ -9,26 +9,23 @@ import cv2
 import re
 
 GAMMA = 0.99
-ACTIONS = 2
 OBSERVATION = 2000
 EXPLORE = 1000000
 INITIAL_EPSILON = 0.1
 FINAL_EPSILON = 0.0001
-REPLAY_MEMORY = 50000
+REPLAY_MEMORY_SIZE = 50
 BATCH_SIZE = 32
 FRAME_PER_ACTION = 2
 LEARNING_RATE = 1e-6
 UPDATE_TIME = 100
-
 MODEL_PATH = "saved_networks_dqn"
 
 class DQN:
     def __init__(self, actions):
         # setup relay memory for later random sampling during training
-        self.replay_memory = deque()
-        self.time_step = 0
-        self.pre_time_step = 0
-        self.last_model_time_step = 0
+        self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+        self.time_in_game = 0
+        self.start_time = 0
         self.epsilon = INITIAL_EPSILON
         self.actions = actions
 
@@ -37,11 +34,11 @@ class DQN:
         # target Q network
         self.state_t, self.Q_value_t, self.W_conv1_t, self.b_conv1_t, self.W_conv2_t, self.b_conv2_t, self.W_conv3_t, self.b_conv3_t, self.W_fc1_t, self.b_fc1_t, self.W_fc2_t, self.b_fc2_t = self.create_network()
 
-        self.copy_target_network_op = [self.W_conv1_t.assign(self.W_conv1), self.b_conv1_t.assign(self.b_conv1),
-                                       self.W_conv2_t.assign(self.W_conv2), self.b_conv2_t.assign(self.b_conv2),
-                                       self.W_conv3_t.assign(self.W_conv3), self.b_conv3_t.assign(self.b_conv3),
-                                       self.W_fc1_t.assign(self.W_fc1), self.b_fc1_t.assign(self.b_fc1),
-                                       self.W_fc2_t.assign(self.W_fc2), self.b_fc2_t.assign(self.b_fc2)]
+        self.copy_Q_net_to_target_net = [self.W_conv1_t.assign(self.W_conv1), self.b_conv1_t.assign(self.b_conv1),
+                                         self.W_conv2_t.assign(self.W_conv2), self.b_conv2_t.assign(self.b_conv2),
+                                         self.W_conv3_t.assign(self.W_conv3), self.b_conv3_t.assign(self.b_conv3),
+                                         self.W_fc1_t.assign(self.W_fc1), self.b_fc1_t.assign(self.b_fc1),
+                                         self.W_fc2_t.assign(self.W_fc2), self.b_fc2_t.assign(self.b_fc2)]
 
         self.action_input = tf.placeholder(tf.float32, [None, self.actions])
         self.target_input = tf.placeholder(tf.float32, [None])
@@ -52,16 +49,16 @@ class DQN:
         self.saver = tf.train.Saver()
         self.session = tf.InteractiveSession()
         self.session.run(tf.global_variables_initializer())
-        checkpoint = tf.train.get_checkpoint_state(MODEL_PATH)
+        self.load_saved_network(MODEL_PATH)
+
+    def load_saved_network(self, path):
+        checkpoint = tf.train.get_checkpoint_state(path)
         if checkpoint and checkpoint.model_checkpoint_path:
             self.saver.restore(self.session, checkpoint.model_checkpoint_path)
-            self.last_model_time_step = int(re.search(re.compile('\\d+'), checkpoint.model_checkpoint_path).group())
-            print "Successfully loaded:", checkpoint.model_checkpoint_path
+            self.start_time = int(re.search(re.compile('\\d+'), checkpoint.model_checkpoint_path).group())
+            print "Successfully loaded saved network:", checkpoint.model_checkpoint_path
         else:
-            print "Could not find old network weights"
-
-    def copy_target_network(self):
-        self.session.run(self.copy_target_network_op)
+            print "Could not find saved network weights"
 
     def create_network(self):
         # CNN
@@ -102,25 +99,23 @@ class DQN:
 
         return state, Q_value, W_conv1, b_conv1, W_conv2, b_conv2, W_conv3, b_conv3, W_fc1, b_fc1, W_fc2, b_fc2
 
-
     def process(self, next_state, action, reward, done):
+        # update state with latest frame
         new_state = np.append(self.current_state[:, :, 1:], next_state, axis=2)
         self.replay_memory.append((self.current_state, action, reward, new_state, done))
-        if len(self.replay_memory) > REPLAY_MEMORY:
-            self.replay_memory.popleft()
-        if self.time_step > OBSERVATION:
+        if self.time_in_game > OBSERVATION:
             # train network
-            minibatch = random.sample(self.replay_memory, BATCH_SIZE)
-            state_batch = [data[0] for data in minibatch]
-            action_batch = [data[1] for data in minibatch]
-            reward_batch = [data[2] for data in minibatch]
-            next_state_batch = [data[3] for data in minibatch]
+            memory_batch = random.sample(self.replay_memory, BATCH_SIZE)
+            state_batch = [data[0] for data in memory_batch]
+            action_batch = [data[1] for data in memory_batch]
+            reward_batch = [data[2] for data in memory_batch]
+            next_state_batch = [data[3] for data in memory_batch]
 
             target_batch = []
             # Q_value_batch = self.session.run(self.Q_value_T, feed_dict={self.state_input:next_state_batch})
             Q_value_batch = self.Q_value_t.eval(feed_dict={self.state_t: next_state_batch})
             for i in range(0, BATCH_SIZE):
-                done = minibatch[i][4]
+                done = memory_batch[i][4]
                 if done:
                     target_batch.append(reward_batch[i])
                 else:
@@ -129,28 +124,29 @@ class DQN:
             self.session.run(self.train_op, feed_dict={self.target_input: target_batch, self.action_input: action_batch,
                                                        self.state: state_batch})
 
-            if self.time_step % 10000 == 0:
+            if self.time_in_game % 10000 == 0:
                 self.saver.save(self.session, MODEL_PATH + "/weights-",
-                                global_step=self.time_step + self.last_model_time_step)
+                                global_step=self.time_in_game + self.start_time)
 
-            if self.time_step % UPDATE_TIME == 0:
-                self.copy_target_network()
+            if self.time_in_game % UPDATE_TIME == 0:
+                self.session.run(self.copy_Q_net_to_target_net)
 
         self.current_state = new_state
-        self.time_step += 1
+        self.time_in_game += 1
 
     def get_action(self):
-        Q_value = self.session.run(self.Q_value, feed_dict={self.state: [self.current_state]})
         action = np.zeros(self.actions)
         action_index = 0
-        if self.time_step % FRAME_PER_ACTION == 0:
+        if self.time_in_game % FRAME_PER_ACTION == 0:
             if random.random() <= self.epsilon:
                 action_index = random.randrange(self.actions)
             else:
+                Q_value = self.session.run(self.Q_value, feed_dict={self.state: [self.current_state]})
                 action_index = np.argmax(Q_value[0])
         action[action_index] = 1
 
-        if self.epsilon > FINAL_EPSILON and self.time_step > OBSERVATION:
+        # decrease epsilon as we explore
+        if self.epsilon > FINAL_EPSILON and self.time_in_game > OBSERVATION:
             self.epsilon -= (INITIAL_EPSILON - FINAL_EPSILON) / EXPLORE
 
         return action
@@ -162,40 +158,35 @@ def preprocess(observation):
     return np.reshape(observation, (80, 80, 1))
 
 
-def print_info(network, score, num_game):
-    print "TIMESTEP", network.time_step, "GAME NUM", num_game, "EPSILON", network.epsilon, "SCORE", score
-    network.pre_time_step = network.time_step
-
-
 def play():
-    network = DQN(ACTIONS)
+    network = DQN(2) # init network with 2 actions
 
     # init flappybird game and the first state
-    flappyBird = game.GameState()
+    flappy_bird = game.GameState()
     action = np.array([1, 0])
-    state, reward, done, _ = flappyBird.frame_step(action)
+    state, reward, done, _ = flappy_bird.frame_step(action)
     state = preprocess(state)
     state = state.reshape((80, 80))
     network.current_state = np.stack((state, state, state, state), axis=2)
 
+    # play game
     _score = 0
     total = 0.0
     num_game = 1
     while True:
         action = network.get_action()
-        next_state, reward, done, score = flappyBird.frame_step(action)
+        next_state, reward, done, score = flappy_bird.frame_step(action)
         if score != 0:
             _score = score
         if done:
-            print_info(network, _score)
+            print "TIME", network.time_in_game, "GAME NUM", num_game, "EPSILON", network.epsilon, "SCORE", score
             total += _score
             num_game += 1
             score = 0
 
-            if num_game == 10:
+            if num_game % 10 == 0:
                 print "\nlast 10 game avg score", total / num_game, "\n"
                 total = 0.0
-                num_game = 0
 
         next_state = preprocess(next_state)
         network.process(next_state, action, reward, done)

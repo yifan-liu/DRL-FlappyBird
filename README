@@ -12,6 +12,7 @@ pip install opencv-python
 python dqn.py
 
 It loads the model stored in 'saved_networks_dqn' folder, if the model exists, and goes on training
+Training from scratch will take at least 8 hours to reach playable network
 
 #### 2. Test
 python dqn.py test

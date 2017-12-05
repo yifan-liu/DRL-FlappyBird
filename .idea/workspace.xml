@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="f0b3ebf1-dc4d-4627-9145-d29ecb4d8ce8" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/BrainDQN_NIPS.py" afterPath="$PROJECT_DIR$/BrainDQN_NIPS.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/README" afterPath="$PROJECT_DIR$/README" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/dqn.py" afterPath="$PROJECT_DIR$/dqn.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -25,8 +25,8 @@
       <file leaf-file-name="dqn.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/dqn.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1673">
-              <caret line="138" column="26" lean-forward="false" selection-start-line="138" selection-start-column="13" selection-end-line="138" selection-end-column="26" />
+            <state relative-caret-position="482">
+              <caret line="128" column="57" lean-forward="false" selection-start-line="128" selection-start-column="57" selection-end-line="128" selection-end-column="57" />
               <folding>
                 <element signature="e#0#23#0" expanded="true" />
               </folding>
@@ -57,8 +57,8 @@
       <file leaf-file-name="BrainDQN_Nature.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/BrainDQN_Nature.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1525">
-              <caret line="47" column="81" lean-forward="false" selection-start-line="47" selection-start-column="60" selection-end-line="47" selection-end-column="81" />
+            <state relative-caret-position="470">
+              <caret line="184" column="59" lean-forward="true" selection-start-line="184" selection-start-column="59" selection-end-line="184" selection-end-column="59" />
               <folding />
             </state>
           </provider>
@@ -67,8 +67,8 @@
       <file leaf-file-name="FlappyBirdDQN.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/FlappyBirdDQN.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="285">
-              <caret line="20" column="27" lean-forward="true" selection-start-line="20" selection-start-column="27" selection-end-line="20" selection-end-column="27" />
+            <state relative-caret-position="450">
+              <caret line="31" column="36" lean-forward="true" selection-start-line="31" selection-start-column="36" selection-end-line="31" selection-end-column="36" />
               <folding />
             </state>
           </provider>
@@ -79,11 +79,18 @@
   <component name="FindInProjectRecents">
     <findStrings>
       <find>OBSERVATION</find>
-      <find>max_pool_2x2</find>
       <find>train_network</find>
       <find>get_action</find>
       <find>initialize</find>
       <find>preprocess</find>
+      <find>copy_target_network</find>
+      <find>last_model_time_step</find>
+      <find>saver</find>
+      <find>pre_time_step</find>
+      <find>print_info</find>
+      <find>start_time</find>
+      <find>ACTIONS</find>
+      <find>max_pool_2x2</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -94,6 +101,7 @@
       <list>
         <option value="$PROJECT_DIR$/BrainDQN_Nature.py" />
         <option value="$PROJECT_DIR$/BrainDQN_NIPS.py" />
+        <option value="$PROJECT_DIR$/README" />
         <option value="$PROJECT_DIR$/dqn.py" />
       </list>
     </option>
@@ -510,24 +518,32 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/BrainDQN_Nature.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1525">
-          <caret line="47" column="81" lean-forward="false" selection-start-line="47" selection-start-column="60" selection-end-line="47" selection-end-column="81" />
+        <state relative-caret-position="470">
+          <caret line="184" column="59" lean-forward="true" selection-start-line="184" selection-start-column="59" selection-end-line="184" selection-end-column="59" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/FlappyBirdDQN.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="285">
-          <caret line="20" column="27" lean-forward="true" selection-start-line="20" selection-start-column="27" selection-end-line="20" selection-end-column="27" />
+        <state relative-caret-position="450">
+          <caret line="31" column="36" lean-forward="true" selection-start-line="31" selection-start-column="36" selection-end-line="31" selection-end-column="36" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="300">
+          <caret line="20" column="59" lean-forward="false" selection-start-line="20" selection-start-column="59" selection-end-line="20" selection-end-column="59" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/dqn.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1673">
-          <caret line="138" column="26" lean-forward="false" selection-start-line="138" selection-start-column="13" selection-end-line="138" selection-end-column="26" />
+        <state relative-caret-position="482">
+          <caret line="128" column="57" lean-forward="false" selection-start-line="128" selection-start-column="57" selection-end-line="128" selection-end-column="57" />
           <folding>
             <element signature="e#0#23#0" expanded="true" />
           </folding>
